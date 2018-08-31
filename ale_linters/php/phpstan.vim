@@ -7,16 +7,7 @@ let g:ale_php_phpstan_level = get(g:, 'ale_php_phpstan_level', '4')
 let g:ale_php_phpstan_configuration = get(g:, 'ale_php_phpstan_configuration', '')
 
 function! ale_linters#php#phpstan#GetCommand(buffer) abort
-    let l:configuration = ale#Var(a:buffer, 'php_phpstan_configuration')
-    let l:configuration_option = !empty(l:configuration)
-    \   ? ' -c ' . l:configuration
-    \   : ''
-
-    return '%e analyze -l'
-    \   . ale#Var(a:buffer, 'php_phpstan_level')
-    \   . ' --errorFormat raw'
-    \   . l:configuration_option
-    \   . ' %s'
+    return '%e --error-format=raw --no-progress --autoload-file=' . get(g:, 'php_autoloader_file') .' analyze %s'
 endfunction
 
 function! ale_linters#php#phpstan#Handle(buffer, lines) abort
