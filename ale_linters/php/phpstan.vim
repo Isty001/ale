@@ -22,7 +22,7 @@ function! ale_linters#php#phpstan#Handle(buffer, lines) abort
         call add(l:output, {
         \   'lnum': l:match[2] + 0,
         \   'text': l:match[3],
-        \   'type': 'W',
+        \   'type': 'E',
         \})
     endfor
 
