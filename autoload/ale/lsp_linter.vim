@@ -38,7 +38,7 @@ function! s:HandleLSPDiagnostics(conn_id, response) abort
 
     let l:loclist = ale#lsp#response#ReadDiagnostics(a:response)
 
-    call ale#engine#HandleLoclist(l:linter_name, l:buffer, l:loclist)
+    call ale#engine#HandleLoclist(l:linter_name, l:buffer, l:loclist, 0)
 endfunction
 
 function! s:HandleTSServerDiagnostics(response, error_type) abort
@@ -81,7 +81,7 @@ function! s:HandleTSServerDiagnostics(response, error_type) abort
     let l:loclist = get(l:info, 'semantic_loclist', [])
     \   + get(l:info, 'syntax_loclist', [])
 
-    call ale#engine#HandleLoclist(l:linter_name, l:buffer, l:loclist)
+    call ale#engine#HandleLoclist(l:linter_name, l:buffer, l:loclist, 0)
 endfunction
 
 function! s:HandleLSPErrorMessage(linter_name, response) abort
@@ -189,6 +189,12 @@ function! ale#lsp_linter#StartLSP(buffer, linter) abort
     endif
 
     let l:language_id = ale#util#GetFunction(a:linter.language_callback)(a:buffer)
+
+    if !empty(get(a:linter, 'lsp_config'))
+        " set LSP configuration options (workspace/didChangeConfiguration)
+        let l:config_message = ale#lsp#message#DidChangeConfiguration(a:buffer, a:linter.lsp_config)
+        call ale#lsp#Send(l:conn_id, l:config_message)
+    endif
 
     let l:details = {
     \   'buffer': a:buffer,
