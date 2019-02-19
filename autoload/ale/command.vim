@@ -236,32 +236,48 @@ function! s:ExitCallback(buffer, line_list, Callback, data) abort
 
     " If the callback starts any new jobs, use the same job type for them.
     call setbufvar(a:buffer, 'ale_job_type', l:job_type)
-    call a:Callback(a:buffer, a:line_list, a:data)
+    let l:value = a:Callback(a:buffer, a:line_list, {
+    \   'exit_code': a:data.exit_code,
+    \   'temporary_file': a:data.temporary_file,
+    \})
+
+    let l:result = a:data.result
+    let l:result.value = l:value
+
+    if get(l:result, 'result_callback', v:null) isnot v:null
+        call call(l:result.result_callback, [l:value])
+    endif
 endfunction
 
-function! ale#command#Run(buffer, command, options) abort
-    let l:Callback = a:options.callback
-    let l:output_stream = get(a:options, 'output_stream', 'stdout')
+function! ale#command#Run(buffer, command, Callback, ...) abort
+    let l:options = get(a:000, 0, {})
+
+    if len(a:000) > 1
+        throw 'Too many arguments!'
+    endif
+
+    let l:output_stream = get(l:options, 'output_stream', 'stdout')
     let l:line_list = []
 
     let [l:temporary_file, l:command, l:file_created] = ale#command#FormatCommand(
     \   a:buffer,
-    \   get(a:options, 'executable', ''),
+    \   get(l:options, 'executable', ''),
     \   a:command,
-    \   get(a:options, 'read_buffer', 0),
-    \   get(a:options, 'input', v:null),
+    \   get(l:options, 'read_buffer', 0),
+    \   get(l:options, 'input', v:null),
     \)
     let l:command = ale#job#PrepareCommand(a:buffer, l:command)
     let l:job_options = {
     \   'exit_cb': {job_id, exit_code -> s:ExitCallback(
     \       a:buffer,
     \       l:line_list,
-    \       l:Callback,
+    \       a:Callback,
     \       {
     \           'job_id': job_id,
     \           'exit_code': exit_code,
     \           'temporary_file': l:temporary_file,
-    \           'log_output': get(a:options, 'log_output', 1),
+    \           'log_output': get(l:options, 'log_output', 1),
+    \           'result': l:result,
     \       }
     \   )},
     \   'mode': 'nl',
@@ -286,6 +302,8 @@ function! ale#command#Run(buffer, command, options) abort
             let s:fake_job_id = get(s:, 'fake_job_id', 0) + 1
             let l:job_id = s:fake_job_id
         endif
+    elseif has('win32')
+        let l:job_id = ale#job#StartWithCmd(l:command, l:job_options)
     else
         let l:job_id = ale#job#Start(l:command, l:job_options)
     endif
@@ -301,6 +319,13 @@ function! ale#command#Run(buffer, command, options) abort
     if g:ale_history_enabled
         call ale#history#Add(a:buffer, l:status, l:job_id, l:command)
     endif
+
+    " We'll return this Dictionary. A `result_callback` can be assigned to it
+    " later for capturing the result of a:Callback.
+    "
+    " The `_deferred_job_id` is used for both checking the type of object, and
+    " for checking the job ID and status.
+    let l:result = {'_deferred_job_id': l:job_id}
 
     if get(g:, 'ale_run_synchronously') == 1 && l:job_id
         " Run a command synchronously if this test option is set.
@@ -326,5 +351,9 @@ function! ale#command#Run(buffer, command, options) abort
         \)
     endif
 
-    return l:job_id ? v:true : v:false
+    return l:result
+endfunction
+
+function! ale#command#IsDeferred(value) abort
+    return type(a:value) is v:t_dict && has_key(a:value, '_deferred_job_id')
 endfunction
