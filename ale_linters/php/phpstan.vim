@@ -4,6 +4,8 @@ let g:ale_php_phpstan_level = get(g:, 'ale_php_phpstan_level', '4')
 let g:ale_php_phpstan_configuration = get(g:, 'ale_php_phpstan_configuration', '')
 
 function! ale_linters#php#phpstan#GetCommand(buffer, version) abort
+    return '%e --error-format=raw --no-progress --autoload-file=' . get(g:, 'php_autoloader_file') .' analyze %s'
+
     let l:configuration = ale#Var(a:buffer, 'php_phpstan_configuration')
     let l:configuration_option = !empty(l:configuration)
     \   ? ' -c ' . l:configuration
